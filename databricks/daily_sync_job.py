@@ -8,14 +8,17 @@
 
 import subprocess, os, sys
 
+WORK_DIR = "/tmp/tool-sync-v2"
 REPO_URL = "https://github.com/josenbach/tool-sync.git"
-WORK_DIR = "/tmp/tool-sync"
 
-# Clone or pull latest
+# Always start clean to pick up latest changes
 if os.path.exists(WORK_DIR):
-    subprocess.check_call(["git", "-C", WORK_DIR, "pull", "--ff-only"], stdout=sys.stdout, stderr=sys.stderr)
-else:
-    subprocess.check_call(["git", "clone", REPO_URL, WORK_DIR], stdout=sys.stdout, stderr=sys.stderr)
+    subprocess.run(["rm", "-rf", WORK_DIR])
+
+subprocess.check_call(
+    ["git", "clone", "--depth", "1", REPO_URL, WORK_DIR],
+    stdout=sys.stdout, stderr=sys.stderr,
+)
 
 # Install dependencies (only what's needed beyond Databricks runtime defaults)
 subprocess.check_call(
@@ -42,6 +45,14 @@ for mod_name in list(sys.modules.keys()):
     if mod_name.startswith("utilities") or mod_name == "daily_tool_sync":
         del sys.modules[mod_name]
 
-from daily_tool_sync import main
-
-main()
+import traceback
+try:
+    from daily_tool_sync import main
+    main()
+except SystemExit as e:
+    if e.code != 0:
+        traceback.print_exc()
+        raise Exception(f"daily_tool_sync exited with code {e.code}")
+except Exception:
+    traceback.print_exc()
+    raise
