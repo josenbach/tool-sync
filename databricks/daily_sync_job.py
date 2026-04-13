@@ -48,13 +48,21 @@ for mod_name in list(sys.modules.keys()):
     if mod_name.startswith(("databricks", "utilities", "daily_tool_sync")):
         del sys.modules[mod_name]
 
-# Verify the import works before proceeding
+# Import from .lib and pin the module references — importing daily_tool_sync
+# triggers transitive imports that can cause the runtime to re-cache its own
+# 'databricks' package, overwriting ours.
 from databricks import sql as _sql_check
 print(f"databricks.sql loaded from: {_sql_check.__file__}")
+
+_pinned = {k: v for k, v in sys.modules.items() if k.startswith("databricks")}
 
 import traceback
 try:
     from daily_tool_sync import main
+
+    # Restore our databricks-sql-connector modules in case they were overwritten
+    sys.modules.update(_pinned)
+
     main()
 except SystemExit as e:
     if e.code != 0:
