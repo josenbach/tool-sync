@@ -1,0 +1,33 @@
+# TipQA Data Source (Databricks)
+DATABRICKS_TOKEN=your_databricks_personal_access_token
+
+# Legacy TipQA SQL Server Credentials (no longer used by default)
+SQL_SERVER_USER=your_username
+SQL_SERVER_PASSWORD=your_password
+
+# Ion API Credentials - V1 Sandbox (joby.aero)
+# Uses sandbox_api
+V1SANDBOX_CLIENT=your_v1_sandbox_client_id
+V1SANDBOX_SECRET=your_v1_sandbox_client_secret
+
+# Ion API Credentials - V2 Sandbox (JobyTest)
+# Uses sandbox_api
+V2SANDBOX_CLIENT=your_v2_sandbox_client_id
+V2SANDBOX_SECRET=your_v2_sandbox_client_secret
+
+# Ion API Credentials - One Ion V1 Production
+# Uses one_ion_api
+V1CLIENT=your_one_ion_v1_client_id
+V1SECRET=your_one_ion_v1_client_secret
+
+# Ion API Credentials - Ion Reloaded V2 Production
+# Uses reloaded_ion_api
+V2CLIENT=your_ion_reloaded_v2_client_id
+V2SECRET=your_ion_reloaded_v2_client_secret
+
+# Ion API Credentials - Ion Reloaded V2 Staging
+# Uses sandbox_api
+V2STAGINGCLIENT=your_ion_reloaded_staging_client_id
+V2STAGINGSECRET=your_ion_reloaded_staging_client_secret
+
+# Copy this file to .env and fill in your actual credentials

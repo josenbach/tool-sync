@@ -1,0 +1,22 @@
+mutation UpdateInventory($input: UpdatePartInventoryInput!) {
+    updatePartInventory(input: $input) {
+        partInventory {
+            id
+            serialNumber
+            status
+            lastMaintainedDate
+            locationId
+            partId
+            part {
+                id
+                partNumber
+            }
+            attributes {
+                key
+                value
+                Etag
+            }
+            _etag
+        }
+    }
+}

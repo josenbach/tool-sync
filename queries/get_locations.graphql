@@ -1,0 +1,14 @@
+query GetLocations($first: Int, $after: String) {
+    locations(first: $first, after: $after) {
+        edges {
+            node {
+                id
+                name
+            }
+        }
+        pageInfo {
+            hasNextPage
+            endCursor
+        }
+    }
+}

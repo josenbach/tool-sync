@@ -1,0 +1,36 @@
+# Query to find a specific part by part number and revision (any partType)
+# Fallback for when a part exists as PART type but needs to be used for a TOOL serial (e.g., JT prefix).
+# No partType filter so it can find parts regardless of their current type.
+# This queries parts directly (not through inventory), so it works even if the part has no inventory.
+query GetPartByNumberAndRevisionAnyType($first: Int, $after: String, $partNumber: String!, $revision: String!) {
+  parts(
+    filters: {
+      partNumber: {ilike: $partNumber},
+      revision: {ilike: $revision}
+    }
+    first: $first
+    after: $after
+  ) {
+    edges {
+      node {
+        id
+        partNumber
+        revision
+        partType
+        trackingType
+        description
+        maintenanceIntervalSeconds
+        attributes {
+          key
+          value
+          Etag
+        }
+        _etag
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

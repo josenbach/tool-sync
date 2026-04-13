@@ -1,0 +1,18 @@
+mutation CreatePart($input: CreatePartInput!) {
+    createPart(input: $input) {
+        part {
+            id
+            partNumber
+            revision
+            description
+            partType
+            trackingType
+            maintenanceIntervalSeconds
+            attributes {
+                key
+                value
+            }
+            _etag
+        }
+    }
+}

@@ -1,0 +1,18 @@
+mutation UpdatePart($input: UpdatePartInput!) {
+    updatePart(input: $input) {
+        part {
+            id
+            partNumber
+            revision
+            partType
+            description
+            trackingType
+            maintenanceIntervalSeconds
+            attributes {
+                key
+                value
+            }
+            _etag
+        }
+    }
+}

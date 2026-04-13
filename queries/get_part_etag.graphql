@@ -1,0 +1,18 @@
+query GetPartEtag($id: ID!) {
+    part(id: $id) {
+        id
+        partNumber
+        revision
+        partType
+        description
+        trackingType
+        maintenanceIntervalSeconds
+        _etag
+        attributes {
+            key
+            value
+            Etag
+        }
+    }
+}
+

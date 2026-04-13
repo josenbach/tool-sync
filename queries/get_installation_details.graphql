@@ -1,0 +1,12 @@
+query GetInstallationDetails($id: ID!) {
+    partInventory(id: $id) {
+        id
+        installed
+        abomInstallations {
+            id
+            buildRequirement {
+                id
+            }
+        }
+    }
+}

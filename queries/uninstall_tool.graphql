@@ -1,0 +1,6 @@
+mutation UninstallTool($id: ID!) {
+    deleteAbomInstallation(id: $id) {
+        success
+        message
+    }
+}

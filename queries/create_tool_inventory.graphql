@@ -1,0 +1,17 @@
+mutation CreatePartInventory($input: CreatePartInventoryInput!) {
+  createPartInventory(input: $input) {
+    partInventory {
+      id
+      serialNumber
+      lastMaintainedDate
+      locationId
+      partId
+      attributes {
+        key
+        value
+        Etag
+      }
+      _etag
+    }
+  }
+}

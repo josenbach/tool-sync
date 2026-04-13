@@ -1,0 +1,56 @@
+query GetAllToolInventory($first: Int, $after: String) {
+  partInventories(
+    filters: {
+      part: {
+        partType: {eq: TOOL}
+      }
+    }
+    first: $first
+    after: $after
+  ) {
+    edges {
+      node {
+        id
+        serialNumber
+        _etag
+        status
+        unavailable
+        lastMaintainedDate
+        location {
+          id
+          name
+        }
+        attributes {
+          key
+          value
+          Etag
+        }
+        part {
+          id
+          partNumber
+          revision
+          partType
+          trackingType
+          description
+          maintenanceIntervalSeconds
+          attributes {
+            key
+            value
+            Etag
+          }
+          _etag
+        }
+        abomInstallations {
+          id
+          buildRequirement {
+            id
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}

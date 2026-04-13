@@ -1,0 +1,57 @@
+# Query to find inventory by serial number only (any part)
+# Used to check if a serial number already exists in Ion, regardless of which part it's associated with
+query GetInventoryBySerial($first: Int, $after: String, $serialNumber: String!) {
+  partInventories(
+    filters: {
+      serialNumber: {eq: $serialNumber}
+    }
+    first: $first
+    after: $after
+  ) {
+    edges {
+      node {
+        id
+        serialNumber
+        _etag
+        status
+        unavailable
+        lastMaintainedDate
+        location {
+          id
+          name
+        }
+        attributes {
+          key
+          value
+          Etag
+        }
+        part {
+          id
+          partNumber
+          revision
+          partType
+          trackingType
+          description
+          maintenanceIntervalSeconds
+          attributes {
+            key
+            value
+            Etag
+          }
+          _etag
+        }
+        abomInstallations {
+          id
+          buildRequirement {
+            id
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+

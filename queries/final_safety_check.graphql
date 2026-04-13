@@ -1,0 +1,11 @@
+query FinalSafetyCheck($id: ID!) {
+    partInventory(id: $id) {
+        id
+        serialNumber
+        part {
+            id
+            partType
+            partNumber
+        }
+    }
+}

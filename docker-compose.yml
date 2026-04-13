@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  daily-sync:
+    build: .
+    container_name: ion-tool-daily-sync
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-v2_production}
+    volumes:
+      # Mount .env file if you want to override from host
+      - ./.env:/app/.env:ro
+    restart: "no"  # Don't restart automatically - run once and exit
+    # Uncomment below if you want to run on a schedule
+    # restart: unless-stopped
+

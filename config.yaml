@@ -1,0 +1,79 @@
+# =============================================================================
+# Tool Synchronization Configuration
+# =============================================================================
+# This configuration file contains all settings for the TipQA-Ion tool
+# synchronization system. It defines database connections, API endpoints,
+# and system parameters used across all components.
+#
+# Environment Variables Required:
+# - DATABRICKS_TOKEN: Databricks personal access token for TipQA data access
+#
+# Author: Joby Aviation Tool Management Team
+# Version: 2.0
+# Last Updated: 2025-09-17
+# =============================================================================
+
+# TipQA data source (Databricks Unity Catalog)
+tipqa_databricks:
+  host: 'joby-aviation-manufacturing.cloud.databricks.com'
+  http_path: '/sql/1.0/warehouses/f3879ba408a6cda8'
+  catalog: 'manufacturing'
+  schema: 'bronze_tipqa'
+  table: 'gt_master'
+  token: '${DATABRICKS_TOKEN}'
+
+
+# Ion API configurations
+sandbox_api:
+  url: 'https://staging-api.buildwithion.com'
+  url_auth: 'https://staging-auth.buildwithion.com/auth/realms/api-keys/protocol/openid-connect/token'
+
+one_ion_api:
+  url: 'https://api.buildwithion.com'
+  url_auth: 'https://auth.buildwithion.com/auth/realms/api-keys/protocol/openid-connect/token'
+
+reloaded_ion_api:
+  url: 'https://api-jobyaero.buildwithion.com'
+  url_auth: 'https://auth-jobyaero.buildwithion.com/auth/realms/api-keys/protocol/openid-connect/token'
+
+# Tool synchronization exceptions and rules
+sync_exceptions:
+  # NOTE: protected_part_ids are NOT used because part IDs differ between environments.
+  # Always use protected_part_numbers instead, which are consistent across all environments.
+
+  # Optional: Map TipQA location codes (e.g. LOCATION_CODE from TipQA) to Ion location names.
+  # When TipQA supplies a code and Ion uses names, add mappings so we can update location
+  # when marking tools available (e.g. moving off Lost to correct location).
+  # location_code_to_ion_name:
+  #   "WH-01": "Warehouse 01"
+  #   "BLDG5": "Building 5"
+  # Optional: Map TipQA location codes directly to Ion location IDs (environment-specific).
+  # location_code_to_ion_id:
+  #   "WH-01": "10001"
+  
+  # Part numbers that should not be created or converted to tools in any Ion environment
+  # These are parts that should remain as parts (not tools) across all environments
+  # Part numbers are universal identifiers that work across V1 Sandbox, V1 Production, V2 Sandbox, and V2 Production
+  protected_part_numbers:
+    - 356A45      # V1 Part ID 2798 / V2 Part ID XXXX - ICP® Accelerometer
+    - TLD339A37   # V1 Part ID 2916 / V2 Part ID XXXX - ACCELEROMETER, TRIAXIAL ICP, TITANIUM HOUSING
+    - 356A17      # V1 Part ID 36372 / V2 Part ID XXXX - Accelerometer (should remain as part, not tool)
+    - Y356A45     # V1Part ID 132361 / V2 Part ID XXXX - Accelerometer (should remain as part, not tool)
+    - TLD333B30
+    - TLD352665
+    - TLD352A56
+    - TLD352C33
+    - TLD356A16
+    - TLD356A32
+    - 320C15
+    - 352C65
+    - 353B04
+    - 356A09
+    - 356A16
+    - 356A17
+    - 356A44
+    - 356B11
+    - 3713B1110G
+    - 4030-006
+    - ADXL326
+    # Add more part numbers here as needed

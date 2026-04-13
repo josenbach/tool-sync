@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+*.secret
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Generated files
+*.csv
+*.xlsx
+*.json
+
+# Test-generated outputs (subset_test, dry_run, daily sync debug)
+tests/update_diagnostic_*.md
+tests/production_test_report_*.md
+tests/comprehensive_analysis_*.md
+
+# Cache
+cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prefect
+.prefect/
+
+# Docker
+.dockerignore
+
+# Local scratch scripts (not tracked)
+quick_scripts/

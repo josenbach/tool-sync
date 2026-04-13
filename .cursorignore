@@ -1,0 +1,18 @@
+# Allow all queries - do not ignore
+!queries/
+!queries/*.graphql
+!queries/*.sql
+
+# Allow all utilities
+!utilities/
+!utilities/*.py
+
+# Allow all tests
+!tests/
+!tests/*.py
+
+# Allow config and main scripts
+!config.yaml
+!daily_tool_sync_v1.py
+!requirements.txt
+!README.md

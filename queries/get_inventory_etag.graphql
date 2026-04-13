@@ -1,0 +1,23 @@
+# Query to get inventory etag (includes part info)
+query GetInventoryEtag($id: ID!) {
+    partInventory(id: $id) {
+        id
+        serialNumber
+        _etag
+        attributes {
+            key
+            value
+            Etag
+        }
+        part {
+            id
+            _etag
+            partType
+            attributes {
+                key
+                value
+                Etag
+            }
+        }
+    }
+}
