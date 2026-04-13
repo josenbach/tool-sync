@@ -56,14 +56,38 @@ print(f"databricks.sql loaded from: {_sql_check.__file__}")
 
 _pinned = {k: v for k, v in sys.modules.items() if k.startswith("databricks")}
 
-import traceback
+import json, traceback
 try:
     from daily_tool_sync import main
 
     # Restore our databricks-sql-connector modules in case they were overwritten
     sys.modules.update(_pinned)
 
-    main()
+    stats = main() or {}
+
+    summary = {
+        "status": "SUCCESS",
+        "total_tools": stats.get("total_tools", 0),
+        "created": stats.get("created", 0),
+        "updated": stats.get("updated", 0),
+        "converted": stats.get("converted", 0),
+        "marked_unavailable": stats.get("marked_unavailable", 0),
+        "marked_available": stats.get("marked_available", 0),
+        "update_then_mark_unavailable": stats.get("update_then_mark_unavailable", 0),
+        "skipped": stats.get("skipped", 0),
+        "errors": stats.get("errors", 0),
+    }
+    if stats.get("error_details"):
+        summary["error_details"] = [
+            {
+                "serial_number": e.get("serial_number"),
+                "action": e.get("action"),
+                "reason": e.get("reason"),
+                "error": e.get("error"),
+            }
+            for e in stats["error_details"][:50]
+        ]
+    dbutils.notebook.exit(json.dumps(summary))
 except SystemExit as e:
     if e.code != 0:
         traceback.print_exc()

@@ -1651,6 +1651,8 @@ def main():
         log_and_print(f"\nTotal duration: {flow_duration:.2f} seconds")
         
         conn.close()
+
+        return stats
         
     except Exception as e:
         log_and_print(f"Error in main: {e}", 'error')
