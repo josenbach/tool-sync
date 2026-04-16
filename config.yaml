@@ -77,3 +77,8 @@ sync_exceptions:
     - 4030-006
     - ADXL326
     # Add more part numbers here as needed
+
+# Slack error notifications (sent via email-based Slack API)
+slack:
+  api_url: 'https://slack-api.subtr.joby.aero/slack/send_by_email/'
+  recipient_email: 'jae.osenbach@joby.aero'

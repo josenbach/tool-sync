@@ -71,6 +71,7 @@ from utilities.shared_sync_utils import (
 )
 from utilities.safety_utils import validate_tool_data, validate_environment_config
 from utilities.tool_processing_utils import create_tool, update_tool, convert_part_to_tool, mark_tool_unavailable, mark_tool_available, update_then_mark_unavailable
+from utilities.slack_utils import send_slack_notification
 
 
 def process_tool_live(tool_data: Dict, token: str, config: Dict[str, Any],
@@ -1647,6 +1648,13 @@ def main():
                 if reasons:
                     log_and_print(f"  Reasons: {', '.join(reasons[:3])}")  # Show first 3 reasons
         
+        # Send Slack notification if any tools errored
+        slack_config = config.get('slack', {})
+        if stats.get('errors', 0) > 0 and slack_config.get('api_url') and slack_config.get('recipient_email'):
+            send_slack_notification(slack_config, stats)
+        elif stats.get('errors', 0) > 0:
+            log_and_print('Slack not configured in config.yaml — skipping Slack notification', 'warning')
+
         flow_duration = time.time() - flow_start_time
         log_and_print(f"\nTotal duration: {flow_duration:.2f} seconds")
         
