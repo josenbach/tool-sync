@@ -78,6 +78,10 @@ sync_exceptions:
     - ADXL326
     # Add more part numbers here as needed
 
+# TipQA REST API (real-time, used by subset_test.py --use-api)
+tipqa_api:
+  base_url: 'https://tipqa-api.subtr.joby.aero'
+
 # Slack error notifications (sent via email-based Slack API)
 slack:
   api_url: 'https://slack-api.subtr.joby.aero/slack/send_by_email/'

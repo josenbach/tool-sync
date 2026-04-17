@@ -1490,14 +1490,8 @@ def is_ion_tool_up_to_date(tool_data: dict, debug: bool = False, valid_ion_locat
                     ion_int = int(float(ion_normalized))  # Ion might also be a string representation
                 
                 # maintenanceIntervalSeconds is a PART-level field shared across
-                # all serials of the same part.  When this serial's TipQA has no
-                # service interval (0/null), it has "no opinion" about the part
-                # field -- another serial sharing the part may legitimately need
-                # a different value.  Only flag a mismatch when TipQA has a
-                # positive value that differs from Ion.
-                if tipqa_int == 0:
-                    continue  # TipQA has no service interval; skip comparison
-                
+                # all serials of the same part.  TipQA is the source of truth:
+                # if TipQA has null/0 and Ion has a value, Ion should be cleared.
                 if tipqa_int != ion_int:
                     mismatches.append(f'service_interval_seconds: TipQA={tipqa_int}, Ion={ion_int}')
                     if not debug:
@@ -1769,9 +1763,7 @@ def determine_update_mutation_complexity(tool_data: dict) -> str:
     
     # 3. Service Interval
     # maintenanceIntervalSeconds is a PART-level field shared across all serials.
-    # Only flag for update when TipQA has a positive value that differs from Ion.
-    # When TipQA is null/0 this serial has "no opinion" -- don't clear a value
-    # that another serial sharing the same part may need.
+    # TipQA is the source of truth: if it differs from Ion (including null vs value), update.
     tipqa_service_interval = tool_data.get('tipqa_service_interval_seconds', '')
     ion_service_interval = tool_data.get('ion_part_maintenanceIntervalSeconds', '')
     
@@ -1788,12 +1780,10 @@ def determine_update_mutation_complexity(tool_data: dict) -> str:
         tipqa_si_int = int(float(tipqa_si_str)) if tipqa_si_str else 0
         ion_si_int = int(float(ion_si_str)) if ion_si_str else 0
         
-        # Only flag when TipQA has a positive value that differs from Ion
-        if tipqa_si_int > 0 and tipqa_si_int != ion_si_int:
+        if tipqa_si_int != ion_si_int:
             part_fields_need_update = True
     except (ValueError, TypeError):
-        # If conversion fails, compare as strings only when TipQA has a value
-        if tipqa_si_str and tipqa_si_str != ion_si_str:
+        if tipqa_si_str != ion_si_str:
             part_fields_need_update = True
     
     # 4. Asset Type (part-level attribute)

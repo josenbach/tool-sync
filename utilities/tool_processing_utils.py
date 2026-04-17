@@ -306,13 +306,11 @@ def normalize_service_interval_for_comparison(value: Any) -> int:
 def _sync_part_service_interval_after_create(token: str, config: Dict, part_id: str, part_number: str, tool_data: Dict, environment: str) -> None:
     """
     After creating inventory for a pre-existing part, sync TipQA service_interval_seconds to the part's
-    maintenanceIntervalSeconds in Ion if they differ. Non-blocking: logs warnings on failure.
-    Only sets/updates the value -- never clears it (part-level field shared across serials).
+    maintenanceIntervalSeconds in Ion if they differ. TipQA is the source of truth — sends null to clear.
+    Non-blocking: logs warnings on failure.
     """
     tipqa_si_raw = tool_data.get('service_interval_seconds') or tool_data.get('tipqa_service_interval_seconds', '')
     service_interval = safe_convert_service_interval(tipqa_si_raw)
-    if service_interval is None:
-        return
     refresh_query = read_query('get_part_etag.graphql')
     refresh_result = post_graphql(token, config, {'query': refresh_query, 'variables': {'id': part_id}}, environment)
     if 'errors' in refresh_result:
@@ -2107,11 +2105,15 @@ def create_tool(token: str, config: Dict[str, Any], tool_data: Dict, environment
                 # Inventory has no existing attributes - add all TipQA attributes without etags
                 updated_inventory_attributes = tipqa_inventory_attributes
             
-            # Format last maintenance date properly
+            # Format last maintenance date properly (None means TipQA cleared it)
             last_maintenance_date_raw = tool_data.get('tipqa_last_maintenance_date') or tool_data.get('last_maintenance_date')
             last_maintenance_date = format_date_for_ion(last_maintenance_date_raw)
             
-            if updated_inventory_attributes or last_maintenance_date:
+            # Determine if TipQA intends to clear the date (raw value is null/empty)
+            tipqa_date_is_null = not last_maintenance_date_raw or str(last_maintenance_date_raw).strip().lower() in ('', 'nan', 'none', 'nat')
+            needs_date_update = last_maintenance_date or tipqa_date_is_null
+            
+            if updated_inventory_attributes or needs_date_update:
                 # Use robust etag handling with retry logic
                 max_retries = 3
                 update_success = False
@@ -2135,9 +2137,11 @@ def create_tool(token: str, config: Dict[str, Any], tool_data: Dict, environment
                         }
                     }
                     
-                    # Add lastMaintainedDate if available
+                    # Always sync lastMaintainedDate — send null to clear if TipQA cleared it
                     if last_maintenance_date:
                         inventory_update_variables['input']['lastMaintainedDate'] = last_maintenance_date
+                    elif tipqa_date_is_null:
+                        inventory_update_variables['input']['lastMaintainedDate'] = None
                     
                     inventory_update_result = post_graphql(token, config, {'query': inventory_update_mutation, 'variables': inventory_update_variables}, environment)
                     
@@ -2707,6 +2711,8 @@ def create_tool(token: str, config: Dict[str, Any], tool_data: Dict, environment
                         last_maintenance_date = format_date_for_ion(last_maintenance_date_raw)
                         if last_maintenance_date:
                             update_variables['input']['lastMaintainedDate'] = last_maintenance_date
+                        elif not last_maintenance_date_raw or str(last_maintenance_date_raw).strip().lower() in ('', 'nan', 'none', 'nat'):
+                            update_variables['input']['lastMaintainedDate'] = None
                         
                         complete_update_result = post_graphql_with_etag_refresh(token, config, {'query': inventory_update_mutation, 'variables': update_variables}, environment)
                         
@@ -3463,10 +3469,9 @@ def update_tool(token: str, config: Dict[str, Any], tool_data: Dict, match_info:
                         'description': description,
                         'attributes': updated_attributes
                     }
-                    # Include maintenanceIntervalSeconds only when TipQA has a positive
-                    # value that differs from Ion.  Never clear (None) -- part-level
-                    # field shared across serials.
-                    if needs_service_interval_update and service_interval is not None:
+                    # TipQA is the source of truth for maintenanceIntervalSeconds:
+                    # send the value (or null to clear) when an update is needed.
+                    if needs_service_interval_update:
                         part_variables_input['maintenanceIntervalSeconds'] = service_interval
                     part_variables = {'input': part_variables_input}
                     
@@ -3512,10 +3517,8 @@ def update_tool(token: str, config: Dict[str, Any], tool_data: Dict, match_info:
                     tool_etag = fresh_inventory_etag
                     log_and_print(f"Got fresh inventory ETag after part update: {fresh_inventory_etag}", 'info')
             
-            # Check service interval against live Ion and update when TipQA has a
-            # positive value that differs.  maintenanceIntervalSeconds is a part-level
-            # field shared across serials, so we never clear it (service_interval is
-            # None) -- only set/update when TipQA provides a positive value.
+            # Check service interval against live Ion and update when TipQA differs
+            # (including clearing when TipQA is null). TipQA is the source of truth.
             #
             # If the batch pre-update phase already updated this part (it's in
             # updated_parts_cache), skip the redundant per-tool update.
@@ -3527,7 +3530,7 @@ def update_tool(token: str, config: Dict[str, Any], tool_data: Dict, match_info:
             if si_already_batched:
                 log_and_print(f"Skipping redundant service interval update for part {part_number} (already updated in batch)", 'info')
                 service_interval_differs_from_live = False
-            elif service_interval is not None:
+            else:
                 refresh_query = read_query('get_part_etag.graphql')
                 refresh_variables = {'id': target_part_id}
                 refresh_result = post_graphql(token, config, {'query': refresh_query, 'variables': refresh_variables}, environment)
@@ -3536,10 +3539,8 @@ def update_tool(token: str, config: Dict[str, Any], tool_data: Dict, match_info:
                     updated_part = refresh_result.get('data', {}).get('part', {})
                     current_interval = updated_part.get('maintenanceIntervalSeconds')
                 current_interval_normalized = None if (current_interval is None or pd.isna(current_interval) or str(current_interval).strip() == '') else int(float(current_interval))
-                service_interval_normalized = service_interval  # positive int from safe_convert_service_interval
+                service_interval_normalized = service_interval
                 service_interval_differs_from_live = (current_interval_normalized != service_interval_normalized)
-            else:
-                service_interval_differs_from_live = False
 
             if service_interval_differs_from_live:
                 log_and_print(f"Updating maintenanceIntervalSeconds for part {part_number} (ID: {target_part_id}) to {service_interval} seconds", 'info')

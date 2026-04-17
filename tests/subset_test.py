@@ -43,7 +43,7 @@ from dotenv import load_dotenv
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utilities.database_utils import get_tipqa_connection, get_tipqa_tools_by_serials, read_sql_query
+from utilities.database_utils import get_tipqa_connection, get_tipqa_tools_by_serials, get_tipqa_tools_from_api, read_sql_query
 from utilities.graphql_utils import get_token
 from utilities.shared_sync_utils import (
     log_and_print, load_config, cleanup_previous_test_files,
@@ -452,6 +452,8 @@ def main():
                        help='Auto-expand subset to include sibling serials sharing the same part (for service-interval testing)')
     parser.add_argument('--analysis-only', action='store_true',
                        help='Only run analysis, do not execute updates (verify fix without making changes)')
+    parser.add_argument('--use-api', action='store_true',
+                       help='Fetch TipQA data from the real-time REST API instead of Databricks (avoids 4-hour lag)')
     
     args = parser.parse_args()
     
@@ -482,12 +484,27 @@ def main():
         log_and_print("No valid tools found in CSV file", 'error')
         sys.exit(1)
     
-    # Connect to TipQA (via Databricks)
-    conn = get_tipqa_connection(config)
-    
-    # CRITICAL: Check TipQA existence first
-    log_and_print("Checking TipQA existence for subset tools...")
-    tipqa_tools_df = get_tipqa_tools_for_subset(subset_df, conn, config)
+    # Fetch TipQA data — either from the real-time REST API or Databricks
+    conn = None
+    if args.use_api:
+        api_config = config.get('tipqa_api', {})
+        if not api_config.get('base_url'):
+            log_and_print("tipqa_api.base_url not set in config.yaml — cannot use --use-api", 'error')
+            sys.exit(1)
+        log_and_print("Using TipQA REST API for real-time data (--use-api)")
+        serial_numbers = subset_df['serial_number'].dropna().unique().tolist()
+        tipqa_tools_df = get_tipqa_tools_from_api(api_config, serial_numbers)
+        found_serials = set(tipqa_tools_df['serial_number'].tolist()) if not tipqa_tools_df.empty else set()
+        missing_serials = set(serial_numbers) - found_serials
+        if missing_serials:
+            log_and_print(f"WARNING: {len(missing_serials)} serial numbers NOT found in TipQA API:", 'warning')
+            for serial in sorted(missing_serials):
+                log_and_print(f"  - {serial}")
+            log_and_print("These serials will be SKIPPED (not processed)")
+    else:
+        conn = get_tipqa_connection(config)
+        log_and_print("Checking TipQA existence for subset tools...")
+        tipqa_tools_df = get_tipqa_tools_for_subset(subset_df, conn, config)
     
     if len(tipqa_tools_df) == 0:
         log_and_print("No tools found in TipQA for the provided serial numbers", 'error')
@@ -498,27 +515,65 @@ def main():
 
     # Optionally expand subset to include sibling serials sharing the same part
     if args.expand_shared_parts:
-        log_and_print("--expand-shared-parts: finding sibling serials that share the same part number...")
-        original_parts = tipqa_tools_df['part_number'].dropna().unique().tolist()
-        if original_parts:
-            part_placeholders = ','.join(['?' for _ in original_parts])
-            sibling_query = (
-                "SELECT gm.TOOL_NUM AS serial_number "
-                "FROM GT_MASTER gm WITH (NOLOCK) "
-                "WHERE gm.BUSINESS_UNIT = 'JAI' "
-                f"AND LTRIM(RTRIM(gm.PART_NUMBER)) IN ({part_placeholders})"
-            )
-            sibling_df = pd.read_sql(sibling_query, conn, params=original_parts)
-            new_serials = set(sibling_df['serial_number'].astype(str).str.strip()) - set(tipqa_tools_df['serial_number'].astype(str).str.strip())
-            if new_serials:
-                log_and_print(f"  Found {len(new_serials)} sibling serials sharing parts {original_parts}")
-                expanded_subset = pd.DataFrame({'serial_number': list(new_serials)})
-                sibling_tipqa = get_tipqa_tools_for_subset(expanded_subset, conn, config)
-                if len(sibling_tipqa) > 0:
-                    tipqa_tools_df = pd.concat([tipqa_tools_df, sibling_tipqa], ignore_index=True).drop_duplicates(subset='serial_number')
+        if args.use_api:
+            log_and_print("--expand-shared-parts with --use-api: finding siblings via API data...", 'warning')
+            original_parts = set(tipqa_tools_df['part_number'].dropna().unique())
+            all_serials = subset_df['serial_number'].astype(str).str.strip().tolist()
+            sibling_tipqa = get_tipqa_tools_from_api(config.get('tipqa_api', {}), [])  # empty → will fetch all, filter below
+            # Re-fetch full table to find siblings by part number
+            full_api_config = config.get('tipqa_api', {})
+            base_url = full_api_config['base_url'].rstrip('/')
+            import requests as _req
+            all_rows: list[dict] = []
+            offset = 0
+            while True:
+                resp = _req.get(f"{base_url}/GT_MASTER/?limit=10000&offset={offset}", timeout=60)
+                resp.raise_for_status()
+                page = resp.json()
+                if not page:
+                    break
+                all_rows.extend(page)
+                if len(page) < 10000:
+                    break
+                offset += 10000
+            from utilities.database_utils import _transform_gt_master_row
+            sibling_records = [
+                _transform_gt_master_row(r) for r in all_rows
+                if r.get('BUSINESS_UNIT') == 'JAI'
+                and (r.get('PART_NUMBER') or '').strip() in original_parts
+            ]
+            sibling_df = pd.DataFrame(sibling_records)
+            if not sibling_df.empty:
+                new_serials = set(sibling_df['serial_number'].astype(str).str.strip()) - set(tipqa_tools_df['serial_number'].astype(str).str.strip())
+                if new_serials:
+                    log_and_print(f"  Found {len(new_serials)} sibling serials sharing parts")
+                    new_rows = sibling_df[sibling_df['serial_number'].isin(new_serials)]
+                    tipqa_tools_df = pd.concat([tipqa_tools_df, new_rows], ignore_index=True).drop_duplicates(subset='serial_number')
                     log_and_print(f"  Expanded subset to {len(tipqa_tools_df)} total serials")
-            else:
-                log_and_print("  No additional sibling serials found")
+                else:
+                    log_and_print("  No additional sibling serials found")
+        else:
+            log_and_print("--expand-shared-parts: finding sibling serials that share the same part number...")
+            original_parts = tipqa_tools_df['part_number'].dropna().unique().tolist()
+            if original_parts:
+                part_placeholders = ','.join(['?' for _ in original_parts])
+                sibling_query = (
+                    "SELECT gm.TOOL_NUM AS serial_number "
+                    "FROM GT_MASTER gm WITH (NOLOCK) "
+                    "WHERE gm.BUSINESS_UNIT = 'JAI' "
+                    f"AND LTRIM(RTRIM(gm.PART_NUMBER)) IN ({part_placeholders})"
+                )
+                sibling_df = pd.read_sql(sibling_query, conn, params=original_parts)
+                new_serials = set(sibling_df['serial_number'].astype(str).str.strip()) - set(tipqa_tools_df['serial_number'].astype(str).str.strip())
+                if new_serials:
+                    log_and_print(f"  Found {len(new_serials)} sibling serials sharing parts {original_parts}")
+                    expanded_subset = pd.DataFrame({'serial_number': list(new_serials)})
+                    sibling_tipqa = get_tipqa_tools_for_subset(expanded_subset, conn, config)
+                    if len(sibling_tipqa) > 0:
+                        tipqa_tools_df = pd.concat([tipqa_tools_df, sibling_tipqa], ignore_index=True).drop_duplicates(subset='serial_number')
+                        log_and_print(f"  Expanded subset to {len(tipqa_tools_df)} total serials")
+                else:
+                    log_and_print("  No additional sibling serials found")
 
     # Get Ion API token
     token = get_token(config, environment=args.environment)
@@ -711,7 +766,8 @@ def main():
         log_and_print("")
         log_and_print(f"Analysis saved to: {analysis_csv}")
         log_and_print("Run without --analysis-only to execute updates")
-        conn.close()
+        if conn:
+            conn.close()
         return
     
     # Run subset sync test using live test logic (only on tools that need updates)
